@@ -1,6 +1,6 @@
 # Meter Public API — Demo Project
 
-This project demonstrates how to query the [Meter](https://meter.com) GraphQL public API. It includes three entry points targeting different use cases: a one-off Python script, an interactive Bash demo, and a live web dashboard.
+This project demonstrates how to query the [Meter](https://meter.com) GraphQL public API. It includes three entry points targeting different use cases: a one-off Python script, an interactive Bash demo, and a live web dashboard. You can find the official documentation for the [Meter API](https://docs.meter.com/reference/api) here.
 
 ---
 
