@@ -7,14 +7,15 @@ This document covers the example scripts and Jupyter notebooks included in this 
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
-2. [basic_query.py](#basic_querypy)
-3. [bundled_query.py](#bundled_querypy)
-4. [error_handling.py](#error_handlingpy)
-5. [rate_limiting.py](#rate_limitingpy)
-6. [meter_sdk.py](#meter_sdkpy)
-7. [modified_server.py](#modified_serverpy)
-8. [Jupyter Notebooks](#jupyter-notebooks)
-9. [Quick Reference](#quick-reference)
+2. [Quick Start](#quick-start)
+3. [basic_query.py](#basic_querypy)
+4. [bundled_query.py](#bundled_querypy)
+5. [error_handling.py](#error_handlingpy)
+6. [rate_limiting.py](#rate_limitingpy)
+7. [meter_sdk.py](#meter_sdkpy)
+8. [modified_server.py](#modified_serverpy)
+9. [Jupyter Notebooks](#jupyter-notebooks)
+10. [Quick Reference](#quick-reference)
 
 ---
 
@@ -38,6 +39,56 @@ pip install -r requirements.txt
 | `VIRTUAL_DEVICE_UUID` | A switch UUID for device-level queries |
 
 API tokens are created in the Dashboard under **Settings → Integrations → API keys**.
+
+---
+
+## Quick Start
+
+**1. Install dependencies and set credentials**
+
+```bash
+pip install -r requirements.txt
+```
+
+Edit [config.py](config.py) with your `API_TOKEN`, `COMPANY_SLUG`, `COMPANY_UUID`, and `NETWORK_UUID`.
+
+**2. Verify authentication**
+
+```bash
+python basic_query.py
+```
+
+This confirms your token is valid and prints your company, networks, devices, and active clients.
+
+**3. Use the SDK for clean, typed access**
+
+```python
+from meter_sdk import MeterClient
+
+client = MeterClient(token="YOUR_API_KEY")
+
+company = client.get_company(slug="acme")
+clients = client.get_network_clients(network_uuid="<NETWORK_UUID>")
+devices = client.get_virtual_devices(network_uuid="<NETWORK_UUID>")
+```
+
+**4. Launch the real-time dashboard**
+
+```bash
+python modified_server.py
+# Open http://localhost:8080
+```
+
+**Where to go next**
+
+| Goal | Script |
+|---|---|
+| Understand auth and individual queries | [basic_query.py](#basic_querypy) |
+| Reduce API calls with query bundling | [bundled_query.py](#bundled_querypy) |
+| Handle errors robustly in production | [error_handling.py](#error_handlingpy) |
+| Manage the 500 req/min rate limit | [rate_limiting.py](#rate_limitingpy) |
+| Explore the full SDK (43 query methods) | [meter_sdk.py](#meter_sdkpy) |
+| Run a live multi-network web dashboard | [modified_server.py](#modified_serverpy) |
 
 ---
 
