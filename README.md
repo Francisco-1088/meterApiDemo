@@ -1,6 +1,10 @@
 # Meter API — Example Scripts Documentation
 
-This document covers the example scripts and Jupyter notebooks included in this project. Each Python script is self-contained and runnable with `python <script>.py` after installing dependencies and setting credentials in [config.py](config.py). Each script also has a matching `.ipynb` notebook that is identical in logic but executable cell-by-cell with live output.
+This document covers a practical introduction to the Meter Graphql API and explains the example scripts and Jupyter notebooks included in this project. Each Python script is self-contained and runnable with `python <script>.py` after installing dependencies and setting credentials in [config.py](config.py). Each script also has a matching `.ipynb` notebook that is identical in logic but executable cell-by-cell with live output.
+
+For more information about:
+* Meter: https://www.meter.com
+* Meter's API: https://docs.meter.com/reference/api
 
 ---
 
@@ -35,9 +39,10 @@ pip install -r requirements.txt
 | `COMPANY_SLUG` | Your company slug (e.g. `"acme"`) |
 | `COMPANY_UUID` | Your company UUID |
 | `NETWORK_UUID` | The network UUID to query |
-| `VIRTUAL_DEVICE_UUID` | A switch UUID for device-level queries |
+| `VIRTUAL_DEVICE_UUID` | A device UUID for device-level queries |
+| `SERIAL` | A serial number for testing a query |
 
-API tokens are created in the Dashboard under **Settings → Integrations → API keys**.
+API tokens are created in the Dashboard under **Settings → Integrations → API keys** as explained [here](https://docs.meter.com/reference/api/authentication) .
 
 ---
 
