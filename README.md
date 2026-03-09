@@ -12,10 +12,9 @@ This document covers the example scripts and Jupyter notebooks included in this 
 4. [bundled_query.py](#bundled_querypy)
 5. [error_handling.py](#error_handlingpy)
 6. [rate_limiting.py](#rate_limitingpy)
-7. [meter_sdk.py](#meter_sdkpy)
-8. [modified_server.py](#modified_serverpy)
-9. [Jupyter Notebooks](#jupyter-notebooks)
-10. [Quick Reference](#quick-reference)
+7. [modified_server.py](#modified_serverpy)
+8. [Jupyter Notebooks](#jupyter-notebooks)
+9. [Quick Reference](#quick-reference)
 
 ---
 
@@ -60,19 +59,7 @@ python basic_query.py
 
 This confirms your token is valid and prints your company, networks, devices, and active clients.
 
-**3. Use the SDK for clean, typed access**
-
-```python
-from meter_sdk import MeterClient
-
-client = MeterClient(token="YOUR_API_KEY")
-
-company = client.get_company(slug="acme")
-clients = client.get_network_clients(network_uuid="<NETWORK_UUID>")
-devices = client.get_virtual_devices(network_uuid="<NETWORK_UUID>")
-```
-
-**4. Launch the real-time dashboard**
+**3. Launch the real-time dashboard**
 
 ```bash
 python modified_server.py
@@ -87,7 +74,6 @@ python modified_server.py
 | Reduce API calls with query bundling | [bundled_query.py](#bundled_querypy) |
 | Handle errors robustly in production | [error_handling.py](#error_handlingpy) |
 | Manage the 500 req/min rate limit | [rate_limiting.py](#rate_limitingpy) |
-| Explore the full SDK (43 query methods) | [meter_sdk.py](#meter_sdkpy) |
 | Run a live multi-network web dashboard | [modified_server.py](#modified_serverpy) |
 
 ---
@@ -505,243 +491,6 @@ Runs 5 sequential requests while logging the remaining count, then prints the fu
 
 ---
 
-## meter_sdk.py
-
-**Purpose:** A complete Python SDK for the Meter GraphQL API. Documents the entire public schema as typed Python constructs and wraps all 43 queries as methods on a single `MeterClient` class.
-
-**Import it**
-
-```python
-from meter_sdk import MeterClient, MetricsFilter, EventType, MeterRateLimitError
-```
-
-### Scalars
-
-Python type aliases for the 12 Meter API scalar types:
-
-| Alias | GraphQL scalar | Format / example |
-|---|---|---|
-| `DateTime` | `DateTime` | RFC 3339 string: `"2026-03-07T15:30:00Z"` |
-| `IP` | `IP` | IPv4 or IPv6: `"192.168.1.1"` |
-| `IPV4` | `IPV4` | IPv4: `"10.0.0.1"` |
-| `IPV6` | `IPV6` | IPv6: `"2001:db8::1"` |
-| `JSONObject` | `JSONObject` | Python `dict` |
-| `MacAddress` | `MacAddress` | `"AA:BB:CC:DD:EE:FF"` |
-| `UUID` | `UUID` | `"550e8400-e29b-41d4-a716-446655440000"` |
-
-Built-in GraphQL scalars (`Boolean`, `Float`, `ID`, `Int`, `String`) map directly to Python's `bool`, `float`, `str`, `int`, `str`.
-
-### Enums
-
-All 10 enum types are implemented as `str, Enum` subclasses so values can be used directly in GraphQL strings without `.value`:
-
-| Class | Values | Used in |
-|---|---|---|
-| `AlertTargetType` | `EMAIL`, `SALESFORCE`, `SLACK`, `WEBHOOK` | Alert target configuration |
-| `ClientAssignmentProtocol` | `DHCP`, `STATIC` | VLAN IP assignment |
-| `DeviceType` | `ACCESS_POINT`, `CELLULAR_GATEWAY`, `CONTROLLER`, `POWER_DISTRIBUTION_UNIT`, `SWITCH` | Hardware device type |
-| `EventType` | 30 values (WAN_UP, WAN_DOWN, DEVICE_OFFLINE, etc.) | Event log filtering |
-| `NetworkClientHWMode` | `NA`, `WIFI_2`–`WIFI_7` | Wi-Fi generation of a client |
-| `RadioBand` | `BAND_2_4G`, `BAND_5G`, `BAND_6G` | Wi-Fi frequency band |
-| `SSIDEncryptionProtocol` | `WPA2`, `WPA3`, `WPA2_ENTERPRISE`, etc. (9 values) | SSID security protocol |
-| `TrafficDirection` | `RX`, `TX` | Uplink throughput direction |
-| `VirtualDeviceType` | Same as `DeviceType` + `OBSERVER` | Logical device type |
-| `WirelessClientConnectionEventType` | `CONNECTED`, `DISASSOCIATED`, `DHCP_OK`, `DHCP_FAILED`, etc. | Wireless event filtering |
-
-### Input types
-
-All 12 input dataclasses implement `to_gql()` which serialises them to a GraphQL inline input object literal:
-
-```python
-f = MetricsFilter(duration_seconds=14400, step_seconds=300)
-f.to_gql()
-# → "{ durationSeconds: 14400, stepSeconds: 300 }"
-```
-
-| Dataclass | Required fields | Optional fields |
-|---|---|---|
-| `MetricsFilter` | `duration_seconds`, `step_seconds` | `end_time` |
-| `ActiveClientsInput` | — | `include_meter_hardware` |
-| `IPRangeInput` | `start`, `end` | — |
-| `NetworkClientsFilter` | `exclude_meter_hardware`, `include_latency`, `include_throughput`, `lookback_minutes` | `ap_serial_number`, `ip_range`, `mac_address`, `ssid`, `timestamp`, `vlan_id` |
-| `DevicesForNetworkFilter` | — | `device_type` |
-| `HardwareDevicesFilter` | — | `device_model`, `device_type`, `limit`, `offset` |
-| `NumberRangeInput` | — | `min`, `max` |
-| `ClientMetricsFilter` | `time_filter` | `bands`, `channels`, `client_mac_addresses`, `event_type`, `event_types`, `exclude_observers`, `rssi`, `ssid_uuids`, `virtual_device_uuids` |
-| `AllClientMetricsFilter` | `time_filter` | — |
-| `ChannelUtilizationFilter` | `time_filter` | — |
-| `CompanyNetworksFilter` | — | `network_uuids` |
-| `SSIDFilter` | — | `is_guest`, `is_hidden`, `ssid` |
-
-### Exceptions
-
-Five typed exceptions derive from `MeterAPIError` (catch-all base):
-
-| Exception | HTTP status | Cause |
-|---|---|---|
-| `MeterAuthError` | 401 | Invalid, expired, or missing API key |
-| `MeterRateLimitError` | 429 | Rate limit exceeded. Has `seconds_to_wait()` method and `retry_after_dt` attribute |
-| `MeterValidationError` | 400 or 422 | Malformed JSON body, unknown field, or empty query. Has `gql_errors` list |
-| `MeterAccessDeniedError` | 200 + UNAUTHORIZED | Valid token but resource is out of scope. Has `gql_errors` list |
-| `MeterGraphQLError` | 200 + errors | Other GraphQL errors. Has `gql_errors` list and `data` for partial results |
-
-**Recommended error handling pattern:**
-
-```python
-import time
-from meter_sdk import MeterClient, MeterRateLimitError, MeterAuthError, MeterAPIError
-
-client = MeterClient(token="YOUR_TOKEN")
-
-try:
-    data = client.get_network_clients(network_uuid="...")
-except MeterAuthError:
-    print("Invalid API key — check config.py")
-except MeterRateLimitError as e:
-    time.sleep(e.seconds_to_wait())
-    data = client.get_network_clients(network_uuid="...")  # retry once
-except MeterAPIError as e:
-    print(f"API error: {e}")
-```
-
-### RateLimitState
-
-`RateLimitState.from_headers(headers)` parses all rate-limit headers from a response into a typed object. Updated automatically after every `MeterClient` request:
-
-```python
-data = client.get_company(slug="acme")
-rl = client.rate_limit
-print(rl.remaining)          # int — requests left
-print(rl.reset_str)          # "Fri, 07 Mar 2026 12:01:00 GMT"
-print(rl.seconds_until_reset())  # float — seconds until window resets
-print(rl.is_exhausted())     # bool — True if remaining == 0
-```
-
-### MeterClient — all 43 query methods
-
-**Instantiation:**
-
-```python
-client = MeterClient(token="YOUR_API_KEY")
-# or with explicit URL and timeout:
-client = MeterClient(token="YOUR_API_KEY", api_url="https://...", timeout=30)
-```
-
-**Company / Network**
-
-| Method | Arguments | Returns |
-|---|---|---|
-| `get_company(slug)` | slug: str | `companyBySlug` dict |
-| `get_networks(company_slug, filter?)` | company_slug: str | `networksForCompany` list |
-| `get_network(uuid)` | uuid: UUID | `network` dict |
-| `get_network_by_slug(company_slug, network_slug)` | both: str | `networkBySlug` dict |
-
-**Clients**
-
-| Method | Arguments | Returns |
-|---|---|---|
-| `get_network_clients(network_uuid, filter?)` | `NetworkClientsFilter` optional | `networkClients` list |
-| `get_networks_clients(company_uuid, network_uuids, filter?)` | list of UUIDs | `networksClients` list |
-| `get_blocked_clients(network_uuid)` | — | `blockedClientsForNetwork` list |
-| `get_active_clients(filter, network_uuid?, network_uuids?, input?)` | `MetricsFilter` required | `activeClients` wired/wireless |
-
-**Devices**
-
-| Method | Arguments | Returns |
-|---|---|---|
-| `get_virtual_device(uuid)` | — | `virtualDevice` dict |
-| `get_virtual_devices(network_uuid, filter?)` | `DevicesForNetworkFilter` optional | `virtualDevicesForNetwork` list |
-| `get_hardware_device(serial_number)` | — | `hardwareDevice` dict |
-| `get_spare_hardware_devices(network_uuid, filter?)` | `HardwareDevicesFilter` optional | list |
-
-**Interfaces**
-
-| Method | Arguments | Returns |
-|---|---|---|
-| `get_phy_interfaces(virtual_device_uuid)` | — | `phyInterfacesForVirtualDevice` list |
-| `get_uplink_interfaces(network_uuid)` | — | `uplinkPhyInterfacesForNetwork` list |
-
-**Switch**
-
-| Method | Arguments | Returns |
-|---|---|---|
-| `get_switch_port_stats(virtual_device_uuid, port_number?, lookback_hours?)` | — | `switchPortStats` list |
-| `get_switch_mac_table(virtual_device_uuid)` | — | `switchMACTable` list |
-| `get_switch_port_metrics_rate(virtual_device_uuid, filter, port_number?)` | `MetricsFilter` required | `switchPortMetricsRate` |
-
-**Controller**
-
-| Method | Arguments | Returns |
-|---|---|---|
-| `get_controller_port_stats(virtual_device_uuid, port_number?, lookback_hours?)` | — | `controllerPortStats` list |
-| `get_controller_port_metrics_rate(virtual_device_uuid, filter, port_number?)` | `MetricsFilter` required | `controllerPortMetricsRate` |
-| `get_controller_dns_request_rates(virtual_device_uuid, filter)` | `MetricsFilter` required | `controllerDNSRequestRates` |
-
-**SSIDs / VLANs / BSSIDs**
-
-| Method | Arguments | Returns |
-|---|---|---|
-| `get_ssid(uuid)` | — | `ssid` dict |
-| `get_ssids(network_uuid, filter?)` | `SSIDFilter` optional | `ssidsForNetwork` list |
-| `get_vlan(uuid)` | — | `vlan` dict |
-| `get_vlans(network_uuid)` | — | `vlans` list |
-| `get_bssids(network_uuid, include_inactive?)` | — | `bssidsForNetwork` list |
-| `get_inter_vlan_pairs(network_uuid)` | — | `interVLANCommunicationPermittedPairs` list |
-
-**Uplink metrics**
-
-| Method | Arguments | Returns |
-|---|---|---|
-| `get_uplink_quality(filter, network_uuid?, network_uuids?, phy_interface_uuid?, virtual_device_uuid?)` | `MetricsFilter` required | `networkUplinkQuality` |
-| `get_uplink_throughput(filter, network_uuid?, network_uuids?, phy_interface_uuid?, virtual_device_uuid?)` | `MetricsFilter` required | `networkUplinkThroughput` |
-| `get_networks_uplink_qualities(network_uuids, filter)` | list + `MetricsFilter` | `networksUplinkQualities` list |
-
-**Wireless metrics**
-
-| Method | Arguments | Returns |
-|---|---|---|
-| `get_wireless_client_metrics(network_uuid, filter)` | `ClientMetricsFilter` required | `wirelessClientMetrics` list |
-| `get_wireless_client_metrics_by_ap(network_uuid, ap_virtual_device_uuid, filter)` | `ClientMetricsFilter` required | `wirelessClientMetricsByAP` |
-| `get_wireless_client_metrics_by_client(network_uuid, mac_address, filter)` | `ClientMetricsFilter` required | `wirelessClientMetricsByClient` |
-| `get_channel_utilization_by_network(network_uuid, filter, band?)` | `ChannelUtilizationFilter` required | `channelUtilizationByNetwork` list |
-| `get_channel_utilization_by_ap(network_uuid, ap_virtual_device_uuid, filter, band?)` | `ChannelUtilizationFilter` required | `channelUtilizationByAP` list |
-| `get_channel_utilization_by_client(network_uuid, mac_address, filter)` | `ChannelUtilizationFilter` required | `channelUtilizationByClient` list |
-| `get_all_client_metrics_by_client(network_uuid, mac_address, filter)` | `AllClientMetricsFilter` required | `allClientMetricsByClient` |
-| `get_all_client_metrics_by_vlan(network_uuid, vlan_uuid, filter)` | `AllClientMetricsFilter` required | `allClientMetricsByVLAN` |
-
-**AP health**
-
-| Method | Arguments | Returns |
-|---|---|---|
-| `get_ap_health_scores(serial_number, filter)` | `MetricsFilter` required | `apHealthScores` list |
-
-**Events**
-
-| Method | Arguments | Returns |
-|---|---|---|
-| `get_event_log(network_uuid, limit, offset?, start_time?, end_time?, type_filter?, virtual_device_uuid_filter?)` | `limit` required | `recentEventLogEventsPage` |
-
-**Alerts**
-
-| Method | Arguments | Returns |
-|---|---|---|
-| `get_alert_receiver(uuid)` | — | `alertReceiver` dict |
-| `get_alert_receivers(company_uuid)` | — | `alertReceiversForCompany` list |
-
-**PDU**
-
-| Method | Arguments | Returns |
-|---|---|---|
-| `get_pdu_metrics(virtual_device_uuid, filter)` | `MetricsFilter` required | `pduMetrics` |
-| `get_pdus_metrics(virtual_device_uuids, filter)` | list + `MetricsFilter` | `pdusMetrics` list |
-
-**Utility**
-
-| Method | Arguments | Returns |
-|---|---|---|
-| `execute_raw(query)` | GraphQL query string | `data` dict |
-
----
 
 ## modified_server.py
 
@@ -1030,81 +779,7 @@ python basic_query.py       # Auth + individual queries
 python bundled_query.py     # Multiple queries per request
 python error_handling.py    # All error types demonstrated
 python rate_limiting.py     # 429 handling with asyncio
-python meter_sdk.py         # SDK usage demo
 python modified_server.py   # Real-time web dashboard (http://localhost:8080)
-```
-
-### Common MetricsFilter values
-
-```python
-from meter_sdk import MetricsFilter
-
-# Last 1 hour, 1-minute buckets
-MetricsFilter(duration_seconds=3600, step_seconds=60)
-
-# Last 4 hours, 5-minute buckets (recommended)
-MetricsFilter(duration_seconds=14400, step_seconds=300)
-
-# Last 24 hours, 1-hour buckets
-MetricsFilter(duration_seconds=86400, step_seconds=3600)
-```
-
-### Filter clients by SSID
-
-```python
-from meter_sdk import MeterClient, NetworkClientsFilter
-
-client = MeterClient(token="...")
-data = client.get_network_clients(
-    network_uuid="...",
-    filter=NetworkClientsFilter(
-        exclude_meter_hardware=True,
-        include_latency=False,
-        include_throughput=False,
-        lookback_minutes=5,
-        ssid="CorpWifi",
-    ),
-)
-```
-
-### Filter event log to WAN events
-
-```python
-from meter_sdk import MeterClient, EventType
-
-client = MeterClient(token="...")
-data = client.get_event_log(
-    network_uuid="...",
-    limit=50,
-    type_filter=[EventType.WAN_UP, EventType.WAN_DOWN, EventType.WAN_STATUS_CHANGE],
-)
-```
-
-### Filter devices to switches only
-
-```python
-from meter_sdk import MeterClient, DevicesForNetworkFilter, VirtualDeviceType
-
-client = MeterClient(token="...")
-data = client.get_virtual_devices(
-    network_uuid="...",
-    filter=DevicesForNetworkFilter(device_type=VirtualDeviceType.SWITCH),
-)
-```
-
-### Bundle queries manually with `execute_raw`
-
-```python
-from meter_sdk import MeterClient
-
-client = MeterClient(token="...")
-data = client.execute_raw("""
-{
-  company:  companyBySlug(slug: "acme")      { name }
-  clients:  networkClients(networkUUID: "...") { macAddress ip }
-  devices:  virtualDevicesForNetwork(networkUUID: "...") { label isOnline }
-}
-""")
 ```
 
 ### modified_server.py — key constants
